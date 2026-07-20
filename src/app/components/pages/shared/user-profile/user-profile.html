@@ -1,0 +1,115 @@
+<div class="user-profile">
+  <div class="page-header">
+    <h2>My Profile</h2>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading profile...</p>
+  </div>
+
+  <div *ngIf="!isLoading && user" class="profile-container">
+    <div class="profile-card">
+      <div class="profile-header">
+        <div class="profile-avatar-wrapper">
+          <div class="profile-avatar-container" (click)="fileInput.click()">
+            <img
+              *ngIf="getCacheBustedImageUrl()"
+              [src]="getCacheBustedImageUrl()"
+              alt="Profile"
+              class="profile-avatar-image"
+            />
+            <div *ngIf="!getCacheBustedImageUrl()" class="profile-avatar">
+              {{ user.name.charAt(0).toUpperCase() }}
+            </div>
+            <div class="profile-avatar-overlay">
+              <span>Change Photo</span>
+            </div>
+          </div>
+          <input
+            type="file"
+            #fileInput
+            accept="image/*"
+            (change)="onFileSelected($event)"
+            style="display: none"
+          />
+        </div>
+
+        <div class="profile-info">
+          <h3 class="profile-name">{{ user.name }}</h3>
+          <span class="profile-role" [ngClass]="getRoleClass(user.role)">
+            {{ user.role }}
+          </span>
+          <p class="profile-email">{{ user.email }}</p>
+        </div>
+      </div>
+
+      <div class="profile-meta">
+        <div class="meta-item">
+          <span class="meta-label">Member since</span>
+          <span class="meta-value">{{ user.createdAt | date: 'mediumDate' }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Phone</span>
+          <span class="meta-value">{{ user.phoneNumber || 'Not set' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <h4 class="form-title">Edit Profile</h4>
+
+      <form [formGroup]="profileForm" (ngSubmit)="onSubmit()" class="profile-form">
+        <div *ngIf="errorMessage" class="alert-error">
+          {{ errorMessage }}
+        </div>
+        <div *ngIf="successMessage" class="alert-success">
+          {{ successMessage }}
+        </div>
+
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input
+            id="name"
+            type="text"
+            formControlName="name"
+            [class.error]="profileForm.get('name')?.invalid && profileForm.get('name')?.touched"
+          />
+          <div
+            *ngIf="profileForm.get('name')?.invalid && profileForm.get('name')?.touched"
+            class="error-text"
+          >
+            Name must be at least 2 characters
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="phoneNumber">Phone Number</label>
+          <input
+            id="phoneNumber"
+            type="tel"
+            formControlName="phoneNumber"
+            placeholder="12345678"
+            [class.error]="
+              profileForm.get('phoneNumber')?.invalid && profileForm.get('phoneNumber')?.touched
+            "
+          />
+          <div
+            *ngIf="
+              profileForm.get('phoneNumber')?.invalid && profileForm.get('phoneNumber')?.touched
+            "
+            class="error-text"
+          >
+            Phone number must be exactly 8 digits
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" [disabled]="profileForm.invalid || isSaving" class="btn-primary">
+            {{ isSaving ? (isUploading ? 'Uploading...' : 'Saving...') : 'Save Changes' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,545 @@
+<div class="dashboard-tickets">
+  <div class="page-header">
+    <h2>Tickets</h2>
+    <a routerLink="/create-ticket" class="btn-primary">New Ticket</a>
+  </div>
+
+  <!-- Search and Filters -->
+  <div class="filters-section">
+    <div class="search-box">
+      <input
+        type="text"
+        placeholder="Search tickets..."
+        [value]="searchText"
+        (input)="onSearchChange($event)"
+        class="search-input"
+      />
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="2"
+        stroke="currentColor"
+        class="search-icon"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+        />
+      </svg>
+    </div>
+    <div class="filter-controls">
+      <select
+        [value]="filterStatus"
+        (change)="onStatusFilterChange($event)"
+        class="filter-select"
+      >
+        <option value="">All Statuses</option>
+        <ng-container *ngFor="let status of filterStatuses">
+          <option [value]="status" *ngIf="status">
+            {{ status }}
+          </option>
+        </ng-container>
+      </select>
+      <select
+        [value]="filterSource"
+        (change)="onSourceFilterChange($event)"
+        class="filter-select"
+      >
+        <option value="">All Sources</option>
+        <ng-container *ngFor="let source of filterSources">
+          <option [value]="source" *ngIf="source">
+            {{ source }}
+          </option>
+        </ng-container>
+      </select>
+      <button
+        (click)="clearFilters()"
+        class="btn-secondary clear-filters-btn"
+        [disabled]="!searchText && !filterStatus && !filterSource"
+      >
+        Clear Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Results Info -->
+  <div *ngIf="!isLoading" class="results-info">
+    <span>Showing {{ filteredCount }} of {{ totalElements }} tickets</span>
+    <div class="page-size-selector">
+      <label for="page-size">Items per page:</label>
+      <select
+        id="page-size"
+        [value]="pageSize"
+        (change)="onPageSizeChange($event)"
+        class="page-size-select"
+      >
+        <option [value]="5">5</option>
+        <option [value]="10">10</option>
+        <option [value]="20">20</option>
+        <option [value]="50">50</option>
+      </select>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading tickets...</p>
+  </div>
+
+  <div *ngIf="!isLoading && tickets.length === 0" class="empty-state">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      class="empty-icon"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      stroke-width="1.5"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+      />
+    </svg>
+    <h3>No tickets yet</h3>
+    <p>Create your first ticket to get started</p>
+    <a routerLink="/create-ticket" class="btn-primary">Create Ticket</a>
+  </div>
+
+  <div *ngIf="!isLoading && tickets.length > 0" class="tickets-grid">
+    <div *ngFor="let ticket of tickets" class="ticket-card">
+      <div class="ticket-header">
+        <h3 class="ticket-title">{{ ticket.title }}</h3>
+        <div class="ticket-header-right">
+          <span class="ticket-status" [ngClass]="getStatusClass(ticket.status)">
+            {{ ticket.status }}
+          </span>
+          <div class="ticket-actions">
+            <button
+              (click)="toggleMenu(ticket.id, $event)"
+              class="action-btn menu-btn"
+              title="Actions"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="currentColor"
+                class="menu-icon"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 6.75a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"
+                />
+              </svg>
+            </button>
+            <div
+              *ngIf="openMenuId === ticket.id"
+              class="dropdown-menu"
+              (click)="$event.stopPropagation()"
+            >
+              <button (click)="openEditDialog(ticket)" class="dropdown-item">Edit Ticket</button>
+              <button
+                (click)="updateStatus(ticket)"
+                [disabled]="ticket.status === TicketStatus.CLOSED || updatingTicketId === ticket.id"
+                class="dropdown-item"
+                [ngClass]="{
+                  disabled: ticket.status === TicketStatus.CLOSED || updatingTicketId === ticket.id,
+                }"
+              >
+                <span *ngIf="updatingTicketId !== ticket.id">Mark as Closed</span>
+                <span *ngIf="updatingTicketId === ticket.id" class="spinner-small"></span>
+              </button>
+              <button (click)="openDeleteDialog(ticket)" class="dropdown-item delete-item">
+                Delete Ticket
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="ticket-desc">{{ ticket.description }}</p>
+      <div class="ticket-meta">
+        <span class="ticket-source" [ngClass]="getSourceBadge(ticket.source)">
+          {{ ticket.source }}
+        </span>
+        <span class="ticket-date">
+          {{ ticket.createdAt | date: 'medium' }}
+        </span>
+      </div>
+      <div *ngIf="ticket.attachments && ticket.attachments.length > 0" class="ticket-attachments">
+        <div class="attachments-label">Attachments</div>
+        <div class="attachments-list">
+          <a
+            *ngFor="let attachment of ticket.attachments"
+            [href]="attachment.publicUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="attachment-link"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              class="attachment-icon"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+              />
+            </svg>
+            <span class="attachment-name">{{ attachment.filename }}</span>
+          </a>
+        </div>
+      </div>
+      <div *ngIf="ticket.analyses && ticket.analyses.length > 0" class="ticket-analysis">
+        <div class="analysis-item">
+          <strong>Category:</strong> {{ ticket.analyses[0].category }}
+        </div>
+        <div class="analysis-item">
+          <strong>Priority:</strong> {{ ticket.analyses[0].priority }}
+        </div>
+        <div class="analysis-item">
+          <strong>Confidence:</strong> {{ (ticket.analyses[0].confidenceScore * 100).toFixed(0) }}%
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div *ngIf="!isLoading && totalPages > 1" class="pagination">
+    <button
+      (click)="previousPage()"
+      [disabled]="!hasPrevious"
+      class="pagination-btn"
+      title="Previous page"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="2"
+        stroke="currentColor"
+        class="pagination-icon"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M15.75 19.5L8.25 12l7.5-7.5"
+        />
+      </svg>
+    </button>
+    
+    <div class="pagination-numbers">
+      <button
+        *ngIf="currentPage > 2"
+        (click)="goToPage(0)"
+        class="pagination-number"
+        [class.active]="currentPage === 0"
+      >
+        1
+      </button>
+      <span *ngIf="currentPage > 3" class="pagination-ellipsis">...</span>
+      
+      <button
+        *ngFor="let page of pageNumbers"
+        (click)="goToPage(page)"
+        class="pagination-number"
+        [class.active]="currentPage === page"
+      >
+        {{ page + 1 }}
+      </button>
+      
+      <span *ngIf="currentPage < totalPages - 4" class="pagination-ellipsis">...</span>
+      <button
+        *ngIf="currentPage < totalPages - 3"
+        (click)="goToPage(totalPages - 1)"
+        class="pagination-number"
+        [class.active]="currentPage === totalPages - 1"
+      >
+        {{ totalPages }}
+      </button>
+    </div>
+    
+    <button
+      (click)="nextPage()"
+      [disabled]="!hasNext"
+      class="pagination-btn"
+      title="Next page"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="2"
+        stroke="currentColor"
+        class="pagination-icon"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M8.25 4.5l7.5 7.5-7.5 7.5"
+        />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Delete Confirmation Dialog -->
+  <div *ngIf="showDeleteDialog" class="dialog-overlay" (click)="closeDeleteDialog()">
+    <div class="dialog-box" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h3>Delete Ticket</h3>
+        <button (click)="closeDeleteDialog()" class="close-btn">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            class="close-icon"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <p class="dialog-message">
+        Are you sure you want to delete the ticket "{{ ticketToDelete?.title }}"? This action cannot
+        be undone.
+      </p>
+      <div class="dialog-actions">
+        <button (click)="closeDeleteDialog()" class="btn-secondary">Cancel</button>
+        <button
+          (click)="confirmDelete()"
+          [disabled]="deletingTicketId === ticketToDelete?.id"
+          class="btn-danger"
+        >
+          <span *ngIf="deletingTicketId !== ticketToDelete?.id">Delete</span>
+          <span *ngIf="deletingTicketId === ticketToDelete?.id" class="spinner-small"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Ticket Dialog -->
+  <div *ngIf="showEditDialog" class="dialog-overlay" (click)="closeEditDialog()">
+    <div class="dialog-box edit-dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h3>Edit Ticket</h3>
+        <button (click)="closeEditDialog()" class="close-btn">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            class="close-icon"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <form [formGroup]="editForm" (ngSubmit)="onSubmitEdit()" class="ticket-form">
+        <div class="form-group">
+          <label for="edit-title">Title</label>
+          <input
+            id="edit-title"
+            type="text"
+            formControlName="title"
+            placeholder="Enter ticket title..."
+            [class.error]="editForm.get('title')?.invalid && editForm.get('title')?.touched"
+          />
+          <div
+            *ngIf="editForm.get('title')?.invalid && editForm.get('title')?.touched"
+            class="error-text"
+          >
+            Title must be at least 3 characters
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-description">Description</label>
+          <textarea
+            id="edit-description"
+            formControlName="description"
+            placeholder="Describe your issue in detail..."
+            rows="6"
+            [class.error]="
+              editForm.get('description')?.invalid && editForm.get('description')?.touched
+            "
+          ></textarea>
+          <div
+            *ngIf="editForm.get('description')?.invalid && editForm.get('description')?.touched"
+            class="error-text"
+          >
+            Description must be at least 10 characters
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-source">Source</label>
+          <select id="edit-source" formControlName="source" class="select-input">
+            <option *ngFor="let source of editSources" [value]="source">
+              {{ source }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-status">Status</label>
+          <select id="edit-status" formControlName="status" class="select-input">
+            <option *ngFor="let status of editStatuses" [value]="status">
+              {{ status }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Attachments</label>
+          <div class="file-upload-area">
+            <input
+              type="file"
+              id="edit-file-upload"
+              multiple
+              (change)="onEditFileSelected($event)"
+              class="file-input"
+            />
+            <label for="edit-file-upload" class="file-upload-label">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="1.5"
+                stroke="currentColor"
+                class="upload-icon"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                />
+              </svg>
+              <span>Click to upload files or drag and drop</span>
+            </label>
+          </div>
+
+          <div *ngIf="hasAttachmentsToShow" class="attachments-list">
+            <div
+              *ngFor="let attachment of editExistingAttachments; let i = index"
+              class="attachment-item"
+              [hidden]="attachment.isRemoved"
+            >
+              <div class="attachment-info">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="file-icon"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                  />
+                </svg>
+                <div class="attachment-details">
+                  <a
+                    [href]="attachment.publicUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="attachment-name"
+                    >{{ attachment.filename }}</a
+                  >
+                </div>
+              </div>
+              <div class="attachment-actions">
+                <button type="button" (click)="removeEditExistingAttachment(i)" class="remove-btn">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke-width="1.5"
+                    stroke="currentColor"
+                    class="remove-icon"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div
+              *ngFor="let attachment of editPendingAttachments; let i = index"
+              class="attachment-item"
+            >
+              <div class="attachment-info">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="file-icon"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                  />
+                </svg>
+                <div class="attachment-details">
+                  <span class="attachment-name">{{ attachment.file.name }}</span>
+                  <span class="attachment-size"
+                    >{{ (attachment.file.size / 1024).toFixed(2) }} KB</span
+                  >
+                </div>
+              </div>
+              <div class="attachment-actions">
+                <span *ngIf="attachment.isUploading" class="uploading-text">Uploading...</span>
+                <span *ngIf="attachment.uploadError" class="upload-error">{{
+                  attachment.uploadError
+                }}</span>
+                <button
+                  type="button"
+                  *ngIf="!attachment.isUploading"
+                  (click)="removeEditPendingAttachment(i)"
+                  class="remove-btn"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke-width="1.5"
+                    stroke="currentColor"
+                    class="remove-icon"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="editError" class="error-message">
+          {{ editError }}
+        </div>
+
+        <div class="form-actions">
+          <button type="button" (click)="closeEditDialog()" class="btn-secondary">Cancel</button>
+          <button type="submit" [disabled]="editForm.invalid || isSavingEdit" class="btn-primary">
+            <span *ngIf="!isSavingEdit">Save Changes</span>
+            <span *ngIf="isSavingEdit" class="spinner-small"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

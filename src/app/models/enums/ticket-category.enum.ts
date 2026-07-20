@@ -1,0 +1,7 @@
+export enum TicketCategory {
+  TECHNICAL = 'TECHNICAL',
+  BILLING = 'BILLING',
+  ACCOUNT = 'ACCOUNT',
+  COMPLAINT = 'COMPLAINT',
+  REQUEST = 'REQUEST',
+}

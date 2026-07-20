@@ -1,0 +1,247 @@
+/* App Shell Container */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+/* Sidebar */
+.sidebar {
+  width: 280px;
+  background: linear-gradient(180deg, #0f172a 0%, #1e3a8a 100%);
+  display: flex;
+  flex-direction: column;
+  color: white;
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  box-shadow: var(--shadow-xl);
+  z-index: 1000;
+  transition: transform 0.3s ease-in-out;
+}
+
+/* Mobile sidebar - hidden by default */
+@media (max-width: 767px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+}
+
+.sidebar-header {
+  padding: 2.5rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-close {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: none; /* Hidden on desktop */
+}
+
+@media (max-width: 767px) {
+  .sidebar-close {
+    display: block;
+  }
+}
+
+.logo {
+  font-size: 1.75rem;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: -0.5px;
+  font-family: 'Playfair Display', serif;
+  background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem 1.5rem;
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all var(--transition-normal);
+  border-radius: var(--radius-md);
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: translateX(4px);
+}
+
+.nav-link.active {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
+  color: white;
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+}
+
+.nav-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.sidebar-footer {
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  transform: translateX(4px);
+}
+
+/* Sidebar Overlay for Mobile */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  margin-left: 280px; /* Match sidebar width */
+}
+
+@media (max-width: 767px) {
+  .main-content {
+    margin-left: 0; /* No margin on mobile */
+  }
+}
+
+/* Top Navigation - Fixed! */
+.top-nav {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 280px; /* Match sidebar width */
+  padding: 1.25rem 2rem;
+  background: white;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+  z-index: 100;
+}
+
+@media (max-width: 767px) {
+  .top-nav {
+    left: 0; /* Full width on mobile */
+    padding: 1rem 1.5rem;
+  }
+}
+
+/* Hamburger Menu Button */
+.hamburger-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: 0.5rem;
+  display: none; /* Hidden on desktop */
+}
+
+@media (max-width: 767px) {
+  .hamburger-btn {
+    display: block;
+  }
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.user-email {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+}
+
+.user-role {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.user-role.admin {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Content Wrapper - Add padding for fixed top nav */
+.content-wrapper {
+  flex: 1;
+  padding: 7rem 2.5rem 2.5rem 2.5rem; /* Top padding = height of fixed nav + some space */
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .content-wrapper {
+    padding: 6rem 1.5rem 2rem 1.5rem; /* Less padding on mobile */
+  }
+}
