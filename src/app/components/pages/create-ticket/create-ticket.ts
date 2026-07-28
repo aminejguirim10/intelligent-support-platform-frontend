@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
+import { Component, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -8,7 +8,7 @@ import { SupabaseService, UploadedAttachment } from '../../../services/supabase.
 import { AttachmentService } from '../../../services/attachment.service';
 import { AuthService } from '../../../services/auth.service';
 import { UserService } from '../../../services/user.service';
-import { AttachmentResponse } from '../../../models/attachment/attachment-response.model';
+import { AiAnalysisService } from '../../../services/ai-analysis.service';
 import { AuthenticationResponse } from '../../../models/auth/authentication-response.model';
 
 interface PendingAttachment {
@@ -29,9 +29,12 @@ export class CreateTicket {
   createForm: FormGroup;
   errorMessage: string | null = null;
   isLoading = false;
-  sources = Object.values(TicketSource);
   pendingAttachments: PendingAttachment[] = [];
   selectedFiles: File[] = [];
+  selectedSource: string | null = null;
+  currentFileTypeAccept: string = '';
+  pendingAnalyzedTickets: any[] = [];
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   constructor(
     private fb: FormBuilder,
@@ -42,11 +45,11 @@ export class CreateTicket {
     private attachmentService: AttachmentService,
     private authService: AuthService,
     private userService: UserService,
+    private aiAnalysisService: AiAnalysisService,
   ) {
     this.createForm = this.fb.group({
       title: ['', [Validators.required, Validators.minLength(3)]],
       description: ['', [Validators.required, Validators.minLength(10)]],
-      source: [TicketSource.WEB, [Validators.required]],
     });
   }
 
@@ -66,6 +69,115 @@ export class CreateTicket {
     }
     event.target.value = '';
     this.cdr.markForCheck();
+  }
+
+  selectSource(source: string): void {
+    this.selectedSource = source;
+    this.createForm.patchValue({ source });
+    this.cdr.markForCheck();
+  }
+
+  changeSource(): void {
+    this.selectedSource = null;
+    this.cdr.markForCheck();
+  }
+
+  triggerFileUpload(fileType: string): void {
+    console.log('triggerFileUpload called with:', fileType);
+    this.selectedSource = fileType;
+    
+    // Set accept attribute based on file type
+    switch (fileType) {
+      case 'TXT':
+        this.currentFileTypeAccept = '.txt';
+        break;
+      case 'CSV':
+        this.currentFileTypeAccept = '.csv';
+        break;
+      case 'DOCX':
+        this.currentFileTypeAccept = '.docx';
+        break;
+      case 'PDF':
+        this.currentFileTypeAccept = '.pdf';
+        break;
+      default:
+        this.currentFileTypeAccept = '';
+    }
+    
+    console.log('File accept set to:', this.currentFileTypeAccept);
+    this.cdr.markForCheck();
+    
+    // Trigger file input click
+    setTimeout(() => {
+      console.log('Clicking file input');
+      this.fileInput.nativeElement.click();
+    }, 0);
+  }
+
+  async onTypeSpecificFileSelected(event: any): Promise<void> {
+    console.log('onTypeSpecificFileSelected called');
+    const files: FileList = event.target.files;
+    console.log('Files selected:', files);
+    if (files && files.length > 0) {
+      const file = files[0];
+      console.log('File:', file.name, file.size);
+      this.isLoading = true;
+      this.errorMessage = null;
+      this.cdr.markForCheck();
+
+      try {
+        // Get JWT token from auth service
+        const jwtToken = this.authService.getToken();
+        console.log('JWT token:', jwtToken ? 'found' : 'not found');
+        
+        if (!jwtToken) {
+          this.errorMessage = 'Authentication required';
+          console.error('No JWT token found');
+          return;
+        }
+
+        console.log('Calling analyzeAndCreateTickets with source:', this.selectedSource);
+        // Call analyze-and-create-tickets endpoint
+        const result = await this.aiAnalysisService.analyzeAndCreateTickets(
+          file,
+          jwtToken,
+          this.selectedSource || 'WEB'
+        ).toPromise();
+        
+        console.log('Result from AI service:', result);
+        
+        if (result && result.count > 0) {
+          // Tickets created successfully in backend
+          console.log('Tickets created successfully, navigating...');
+          this.router.navigate(['/dashboard/tickets']);
+        } else {
+          this.errorMessage = 'No tickets created from file';
+          console.error('No tickets created');
+        }
+      } catch (error) {
+        console.error('Error processing file:', error);
+        this.errorMessage = error instanceof Error ? error.message : 'Failed to process file';
+      } finally {
+        this.isLoading = false;
+        this.cdr.markForCheck();
+      }
+    }
+    
+    // Reset file input
+    event.target.value = '';
+  }
+
+  private readFileContent(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve(e.target?.result as string);
+      };
+      reader.onerror = (e) => {
+        reject(new Error('Failed to read file'));
+      };
+      reader.readAsText(file);
+    });
   }
 
   async uploadPendingAttachments(): Promise<number[]> {
@@ -171,31 +283,82 @@ export class CreateTicket {
       let attachmentIds: number[] = [];
 
       if (this.pendingAttachments.length > 0) {
-        // Only upload attachments if there are any
         attachmentIds = await this.uploadPendingAttachments();
       }
 
-      this.ticketService
-        .createTicket({
-          ...this.createForm.value,
-          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-        })
-        .subscribe({
-          next: () => {
-            this.isLoading = false;
-            this.router.navigate(['/dashboard/tickets']);
-          },
-          error: (err: any) => {
-            this.isLoading = false;
-            this.errorMessage = err.error?.message || 'Failed to create ticket. Please try again.';
-            this.cdr.markForCheck();
-          },
-        });
+      // Single ticket creation (manual form entry with analyze-text)
+      const description = this.createForm.value.description;
+      let aiAnalysis: any = null;
+      
+      try {
+        const analysisResults = await this.aiAnalysisService.analyzeText(description).toPromise();
+        if (analysisResults && analysisResults.length > 0) {
+          aiAnalysis = analysisResults[0];
+        }
+      } catch (aiError) {
+        console.error('AI analysis failed, proceeding without analysis:', aiError);
+      }
+
+      await this.createSingleTicket(description, 'WEB', attachmentIds, aiAnalysis);
+
+      this.isLoading = false;
+      this.router.navigate(['/dashboard/tickets']);
     } catch (error) {
       this.isLoading = false;
       this.errorMessage =
-        error instanceof Error ? error.message : 'Failed to upload attachments. Please try again.';
+        error instanceof Error ? error.message : 'Failed to create ticket. Please try again.';
       this.cdr.markForCheck();
     }
+  }
+
+  private async createTicketFromAnalysis(
+    analyzedTicket: any,
+    source: string,
+    attachmentIds: number[]
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.ticketService
+        .createTicket({
+          title: analyzedTicket.analysis.category || `Ticket from ${source}`,
+          description: analyzedTicket.text,
+          source: source as any,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+          aiAnalysis: analyzedTicket.analysis,
+        })
+        .subscribe({
+          next: () => {
+            resolve();
+          },
+          error: (err: any) => {
+            reject(err);
+          },
+        });
+    });
+  }
+
+  private async createSingleTicket(
+    description: string,
+    source: string,
+    attachmentIds: number[],
+    aiAnalysis: any = null
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.ticketService
+        .createTicket({
+          title: this.createForm.value.title,
+          description: description,
+          source: source as any,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+          aiAnalysis: aiAnalysis,
+        })
+        .subscribe({
+          next: () => {
+            resolve();
+          },
+          error: (err: any) => {
+            reject(err);
+          },
+        });
+    });
   }
 }

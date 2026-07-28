@@ -2,7 +2,10 @@
   <!-- Sidebar -->
   <aside class="sidebar" [class.sidebar-open]="sidebarOpen">
     <div class="sidebar-header">
-      <h1 class="logo">SupportAI</h1>
+      <div class="logo-container">
+        <img src="/logo.png" alt="SupportAI Logo" class="sidebar-logo" />
+        <h1 class="logo">SupportAI</h1>
+      </div>
       <!-- Close button only on mobile -->
       <button class="sidebar-close" (click)="toggleSidebar()" *ngIf="isMobile">
         <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -32,6 +35,17 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
         </svg>
         <span>New Ticket</span>
+      </a>
+      <a
+        routerLink="/agent"
+        routerLinkActive="active"
+        class="nav-link"
+        (click)="handleNavLinkClick()"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+        <span>Agent</span>
       </a>
       <a
         *ngIf="isAdmin"
@@ -80,8 +94,14 @@
         </svg>
       </button>
       <div class="user-info">
-        <span class="user-email">{{ user?.email }}</span>
-        <span class="user-role" [class.admin]="isAdmin">{{ user?.role }}</span>
+        <div class="user-details-left">
+          <span class="user-email">{{ user?.email }}</span>
+          <span class="user-role" [class.admin]="isAdmin">{{ user?.role }}</span>
+        </div>
+        <div class="user-avatar" [class.has-photo]="hasProfilePhoto()">
+          <img *ngIf="hasProfilePhoto()" [src]="getCacheBustedImageUrl()" [alt]="user?.name" class="profile-photo" />
+          <span *ngIf="!hasProfilePhoto()" class="avatar-initial">{{ getInitial(user?.name) }}</span>
+        </div>
       </div>
     </header>
     <div class="content-wrapper">

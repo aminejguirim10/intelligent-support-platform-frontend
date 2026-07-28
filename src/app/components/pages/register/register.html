@@ -1,79 +1,100 @@
 <div class="register-container">
-  <div class="register-card">
-    <div class="register-header">
-      <h1>Create account</h1>
-      <p>Join the Intelligent Support Platform</p>
+  <div class="register-split-card">
+    <!-- Brand Panel (Left Side) -->
+    <div class="brand-panel">
+      <div class="brand-content">
+        <div class="logo-box">
+          <img src="/logo.png" alt="SupportAI Logo" class="brand-logo" />
+        </div>
+        <span class="eyebrow">INTELLIGENT SUPPORT PLATFORM</span>
+        <h2 class="brand-title">Create your support space</h2>
+        <p class="brand-subtitle">
+          Join us to experience an AI-driven, intuitive support system designed for fast and effective resolutions.
+        </p>
+      </div>
     </div>
-    <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="register-form">
-      <div class="form-group">
-        <label for="name">Full name</label>
-        <input
-          id="name"
-          type="text"
-          formControlName="name"
-          placeholder="John Doe"
-          [class.error]="registerForm.get('name')?.invalid && registerForm.get('name')?.touched"
-        />
-        <div *ngIf="registerForm.get('name')?.invalid && registerForm.get('name')?.touched" class="error-text">
-          Name must be at least 2 characters
+
+    <!-- Form Panel (Right Side) -->
+    <div class="form-panel">
+      <div class="form-header">
+        <h1>Create Account</h1>
+        <p>Fill in the details below to join the platform.</p>
+      </div>
+
+      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="register-form">
+        <!-- Flex row for Name and Phone to keep it compact and avoid scrolling -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="name">Full name</label>
+            <input
+              id="name"
+              type="text"
+              formControlName="name"
+              placeholder="John Doe"
+              [class.error]="registerForm.get('name')?.invalid && registerForm.get('name')?.touched"
+            />
+            <div *ngIf="registerForm.get('name')?.invalid && registerForm.get('name')?.touched" class="error-text">
+              Min 2 characters
+            </div>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="phoneNumber">Phone number</label>
+            <input
+              id="phoneNumber"
+              type="tel"
+              formControlName="phoneNumber"
+              placeholder="12345678"
+              [class.error]="registerForm.get('phoneNumber')?.invalid && registerForm.get('phoneNumber')?.touched"
+            />
+            <div *ngIf="registerForm.get('phoneNumber')?.invalid && registerForm.get('phoneNumber')?.touched" class="error-text">
+              Exactly 8 digits
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          formControlName="email"
-          placeholder="you@example.com"
-          [class.error]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched"
-        />
-        <div *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched" class="error-text">
-          Please enter a valid email
+
+        <div class="form-group">
+          <label for="email">Email address</label>
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            placeholder="you@example.com"
+            [class.error]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched"
+          />
+          <div *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched" class="error-text">
+            Please enter a valid email address
+          </div>
         </div>
-      </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          formControlName="password"
-          placeholder="••••••••"
-          [class.error]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched"
-        />
-        <div *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched" class="error-text">
-          Password must be at least 8 characters
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            formControlName="password"
+            placeholder="••••••••"
+            [class.error]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched"
+          />
+          <div *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched" class="error-text">
+            Password must be at least 8 characters
+          </div>
         </div>
-      </div>
-      <div class="form-group">
-        <label for="phoneNumber">Phone number</label>
-        <input
-          id="phoneNumber"
-          type="tel"
-          formControlName="phoneNumber"
-          placeholder="12345678"
-          [class.error]="registerForm.get('phoneNumber')?.invalid && registerForm.get('phoneNumber')?.touched"
-        />
-        <div *ngIf="registerForm.get('phoneNumber')?.invalid && registerForm.get('phoneNumber')?.touched" class="error-text">
-          Phone number must be exactly 8 digits
+
+        <div *ngIf="errorMessage" class="error-message">
+          {{ errorMessage }}
         </div>
+
+        <button type="submit" [disabled]="registerForm.invalid || isLoading" class="submit-btn">
+          {{ isLoading ? 'Creating account...' : 'Create account' }}
+        </button>
+      </form>
+
+      <div class="form-footer">
+        <p>
+          Already have an account? <a routerLink="/login">Sign in</a>
+        </p>
       </div>
-      <div class="form-group">
-        <label for="role">Role</label>
-        <select id="role" formControlName="role" class="select-input">
-          <option *ngFor="let role of roles" [value]="role">{{ role }}</option>
-        </select>
-      </div>
-      <div *ngIf="errorMessage" class="error-message">
-        {{ errorMessage }}
-      </div>
-      <button type="submit" [disabled]="registerForm.invalid || isLoading" class="submit-btn">
-        {{ isLoading ? 'Creating account...' : 'Create account' }}
-      </button>
-    </form>
-    <div class="register-footer">
-      <p>
-        Already have an account? <a routerLink="/login">Sign in</a>
-      </p>
     </div>
   </div>
 </div>

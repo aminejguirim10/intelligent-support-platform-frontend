@@ -15,7 +15,6 @@ export class Register {
   registerForm: FormGroup;
   errorMessage: string | null = null;
   isLoading = false;
-  roles = Object.values(Role);
 
   constructor(
     private fb: FormBuilder,

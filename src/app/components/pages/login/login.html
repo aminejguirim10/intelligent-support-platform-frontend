@@ -1,48 +1,70 @@
 <div class="login-container">
-  <div class="login-card">
-    <div class="login-header">
-      <h1>Welcome back</h1>
-      <p>Sign in to your Intelligent Support account</p>
+  <div class="login-split-card">
+    <!-- Brand Panel (Left Side) -->
+    <div class="brand-panel">
+      <div class="brand-content">
+        <div class="logo-box">
+          <img src="/logo.png" alt="SupportAI Logo" class="brand-logo" />
+        </div>
+        <span class="eyebrow">INTELLIGENT SUPPORT PLATFORM</span>
+        <h2 class="brand-title">Welcome to your support space</h2>
+        <p class="brand-subtitle">
+          Log in to access your personal dashboard in a simple, clear, and secure environment.
+        </p>
+      </div>
     </div>
-    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login-form">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          formControlName="email"
-          placeholder="you@example.com"
-          [class.error]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched"
-        />
-        <div *ngIf="loginForm.get('email')?.invalid && loginForm.get('email')?.touched" class="error-text">
-          Please enter a valid email
+
+    <!-- Form Panel (Right Side) -->
+    <div class="form-panel">
+      <div class="form-header">
+        <h1>Sign In</h1>
+        <p>Use your email and password to access your account.</p>
+      </div>
+
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login-form">
+        <div class="form-group">
+          <label for="email">Email address</label>
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            placeholder="you@example.com"
+            [class.error]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched"
+          />
+          <div *ngIf="loginForm.get('email')?.invalid && loginForm.get('email')?.touched" class="error-text">
+            Please enter a valid email address
+          </div>
         </div>
-      </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          formControlName="password"
-          placeholder="••••••••"
-          [class.error]="loginForm.get('password')?.invalid && loginForm.get('password')?.touched"
-        />
-        <div *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched" class="error-text">
-          Password is required
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            formControlName="password"
+            placeholder="••••••••"
+            [class.error]="loginForm.get('password')?.invalid && loginForm.get('password')?.touched"
+          />
+          <div *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched" class="error-text">
+            Password is required
+          </div>
+          <a routerLink="/forgot-password" class="forgot-link-below">Forgot password?</a>
         </div>
+
+        <div *ngIf="errorMessage" class="error-message">
+          {{ errorMessage }}
+        </div>
+
+        <button type="submit" [disabled]="loginForm.invalid || isLoading" class="submit-btn">
+          {{ isLoading ? 'Signing in...' : 'Sign in' }}
+        </button>
+      </form>
+
+      <div class="form-footer">
+        <p>
+          Don't have an account? <a routerLink="/register">Sign up</a>
+        </p>
       </div>
-      <div *ngIf="errorMessage" class="error-message">
-        {{ errorMessage }}
-      </div>
-      <button type="submit" [disabled]="loginForm.invalid || isLoading" class="submit-btn">
-        {{ isLoading ? 'Signing in...' : 'Sign in' }}
-      </button>
-    </form>
-    <div class="login-footer">
-      <p>
-        Don't have an account? <a routerLink="/register">Sign up</a>
-      </p>
-      <a routerLink="/forgot-password" class="forgot-link">Forgot password?</a>
     </div>
   </div>
 </div>

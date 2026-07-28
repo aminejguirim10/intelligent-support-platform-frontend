@@ -4,4 +4,13 @@ export interface TicketRequest {
   source: string;
   status?: string;
   attachmentIds?: number[];
+  aiAnalysis?: AIAnalysisRequest;
+}
+
+export interface AIAnalysisRequest {
+  category: string;
+  priority: string;
+  sentiment: string;
+  keywords: string;
+  confidenceScore: number;
 }

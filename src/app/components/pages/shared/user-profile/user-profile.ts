@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { CommonModule, DatePipe } from '@angular/common';
 import { UserService } from '../../../../services/user.service';
 import { SupabaseService } from '../../../../services/supabase.service';
+import { AuthService } from '../../../../services/auth.service';
 import { UserResponse } from '../../../../models/user/user-response.model';
 import { Role } from '../../../../models/enums/role.enum';
 
@@ -29,6 +30,7 @@ export class UserProfile implements OnInit {
     private fb: FormBuilder,
     private userService: UserService,
     private supabaseService: SupabaseService,
+    private authService: AuthService,
     private cdr: ChangeDetectorRef,
   ) {
     this.profileForm = this.fb.group({
@@ -126,6 +128,13 @@ export class UserProfile implements OnInit {
           this.isSaving = false;
           this.isUploading = false;
           this.successMessage = 'Profile updated successfully!';
+          
+          // Update localStorage to reflect changes in navigation
+          this.authService.updateUser({
+            name: updatedUser.name,
+            profilePhotoUrl: updatedUser.profilePhotoUrl,
+          });
+          
           this.cdr.markForCheck();
 
           setTimeout(() => {

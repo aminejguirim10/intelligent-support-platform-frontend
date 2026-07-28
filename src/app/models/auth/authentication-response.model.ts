@@ -6,4 +6,6 @@ export interface AuthenticationResponse {
   id: number;
   email: string;
   role: string;
+  name: string;
+  profilePhotoUrl: string;
 }

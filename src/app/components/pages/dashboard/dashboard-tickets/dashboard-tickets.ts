@@ -9,6 +9,8 @@ import { TicketResponse } from '../../../../models/ticket/ticket-response.model'
 import { PageResponse } from '../../../../models/page-response.model';
 import { TicketStatus } from '../../../../models/enums/ticket-status.enum';
 import { TicketSource } from '../../../../models/enums/ticket-source.enum';
+import { TicketCategory } from '../../../../models/enums/ticket-category.enum';
+import { TicketPriority } from '../../../../models/enums/ticket-priority.enum';
 import { Role } from '../../../../models/enums/role.enum';
 import { TicketRequest } from '../../../../models/ticket/ticket-request.model';
 import { SupabaseService, UploadedAttachment } from '../../../../services/supabase.service';
@@ -42,6 +44,8 @@ interface ExistingAttachment {
 export class DashboardTickets implements OnInit, OnDestroy {
   TicketStatus = TicketStatus;
   TicketSource = TicketSource;
+  TicketCategory = TicketCategory;
+  TicketPriority = TicketPriority;
   tickets: TicketResponse[] = [];
   allTickets: TicketResponse[] = [];
   isLoading = true;
@@ -51,6 +55,8 @@ export class DashboardTickets implements OnInit, OnDestroy {
   openMenuId: number | null = null;
   showDeleteDialog = false;
   ticketToDelete: TicketResponse | null = null;
+  showCloseDialog = false;
+  ticketToClose: TicketResponse | null = null;
   showEditDialog = false;
   ticketToEdit: TicketResponse | null = null;
   editForm: FormGroup;
@@ -74,8 +80,12 @@ export class DashboardTickets implements OnInit, OnDestroy {
   searchText = '';
   filterStatus: TicketStatus | '' = '';
   filterSource: TicketSource | '' = '';
+  filterCategory: TicketCategory | '' = '';
+  filterPriority: TicketPriority | '' = '';
   filterStatuses = ['', ...Object.values(TicketStatus)];
   filterSources = ['', ...Object.values(TicketSource)];
+  filterCategories = ['', ...Object.values(TicketCategory)];
+  filterPriorities = ['', ...Object.values(TicketPriority)];
   
   // Debounced search
   private searchSubject = new Subject<string>();
@@ -92,7 +102,7 @@ export class DashboardTickets implements OnInit, OnDestroy {
     this.editForm = this.fb.group({
       title: ['', [Validators.required, Validators.minLength(3)]],
       description: ['', [Validators.required, Validators.minLength(10)]],
-      source: [TicketSource.WEB, [Validators.required]],
+      source: [TicketSource.CSV, [Validators.required]],
       status: [TicketStatus.OPEN, [Validators.required]],
     });
   }
@@ -155,7 +165,7 @@ export class DashboardTickets implements OnInit, OnDestroy {
     observable.subscribe({
       next: (page: PageResponse<TicketResponse>) => {
         this.allTickets = page.content;
-        this.tickets = page.content;
+        this.tickets = this.applyClientSideFilters(page.content);
         this.currentPage = page.currentPage;
         this.totalPages = page.totalPages;
         this.totalElements = page.totalElements;
@@ -171,6 +181,26 @@ export class DashboardTickets implements OnInit, OnDestroy {
     });
   }
 
+  applyClientSideFilters(tickets: TicketResponse[]): TicketResponse[] {
+    let filtered = tickets;
+    
+    if (this.filterCategory) {
+      filtered = filtered.filter(ticket => 
+        ticket.analyses && ticket.analyses.length > 0 && 
+        ticket.analyses[0].category === this.filterCategory
+      );
+    }
+    
+    if (this.filterPriority) {
+      filtered = filtered.filter(ticket => 
+        ticket.analyses && ticket.analyses.length > 0 && 
+        ticket.analyses[0].priority === this.filterPriority
+      );
+    }
+    
+    return filtered;
+  }
+
   getStatusClass(status: TicketStatus): string {
     return status === TicketStatus.OPEN ? 'status-open' : 'status-closed';
   }
@@ -183,6 +213,12 @@ export class DashboardTickets implements OnInit, OnDestroy {
         return 'source-chat';
       case TicketSource.CSV:
         return 'source-csv';
+      case TicketSource.TXT:
+        return 'source-txt';
+      case TicketSource.DOCX:
+        return 'source-docx';
+      case TicketSource.PDF:
+        return 'source-pdf';
       default:
         return '';
     }
@@ -208,28 +244,40 @@ export class DashboardTickets implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  updateStatus(ticket: TicketResponse): void {
-    if (this.updatingTicketId === ticket.id || ticket.status === TicketStatus.CLOSED) return;
-
-    this.updatingTicketId = ticket.id;
+  openCloseDialog(ticket: TicketResponse): void {
+    this.ticketToClose = ticket;
+    this.showCloseDialog = true;
     this.openMenuId = null;
+    this.cdr.markForCheck();
+  }
+
+  closeCloseDialog(): void {
+    this.showCloseDialog = false;
+    this.ticketToClose = null;
+    this.cdr.markForCheck();
+  }
+
+  confirmClose(): void {
+    if (!this.ticketToClose) return;
+
+    this.updatingTicketId = this.ticketToClose.id;
 
     const updateRequest: TicketRequest = {
-      title: ticket.title,
-      description: ticket.description,
-      source: ticket.source.toString(),
+      title: this.ticketToClose.title,
+      description: this.ticketToClose.description,
+      source: this.ticketToClose.source.toString(),
       status: TicketStatus.CLOSED.toString(),
-      attachmentIds: ticket.attachments?.map((a) => a.id) || [],
+      attachmentIds: this.ticketToClose.attachments?.map((a) => a.id) || [],
     };
 
-    this.ticketService.updateTicket(ticket.id, updateRequest).subscribe({
+    this.ticketService.updateTicket(this.ticketToClose.id, updateRequest).subscribe({
       next: (updatedTicket) => {
-        const index = this.tickets.findIndex((t) => t.id === ticket.id);
+        const index = this.tickets.findIndex((t) => t.id === this.ticketToClose!.id);
         if (index !== -1) {
           this.tickets[index] = updatedTicket;
         }
         this.updatingTicketId = null;
-        this.cdr.markForCheck();
+        this.closeCloseDialog();
       },
       error: () => {
         this.updatingTicketId = null;
@@ -255,6 +303,10 @@ export class DashboardTickets implements OnInit, OnDestroy {
     } else {
       statusControl?.enable();
     }
+
+    // Disable source control to prevent modification
+    const sourceControl = this.editForm.get('source');
+    sourceControl?.disable();
 
     this.editExistingAttachments =
       ticket.attachments?.map((a) => ({
@@ -540,10 +592,26 @@ export class DashboardTickets implements OnInit, OnDestroy {
     this.loadTickets();
   }
 
+  onCategoryFilterChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    this.filterCategory = select.value as TicketCategory | '';
+    this.currentPage = 0;
+    this.loadTickets();
+  }
+
+  onPriorityFilterChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    this.filterPriority = select.value as TicketPriority | '';
+    this.currentPage = 0;
+    this.loadTickets();
+  }
+
   clearFilters(): void {
     this.searchText = '';
     this.filterStatus = '';
     this.filterSource = '';
+    this.filterCategory = '';
+    this.filterPriority = '';
     this.currentPage = 0;
     this.loadTickets();
   }
@@ -554,7 +622,7 @@ export class DashboardTickets implements OnInit, OnDestroy {
 
   get pageNumbers(): number[] {
     const pages: number[] = [];
-    const maxVisiblePages = 5;
+    const maxVisiblePages = 3;
     
     if (this.totalPages <= maxVisiblePages) {
       for (let i = 0; i < this.totalPages; i++) {
@@ -570,6 +638,74 @@ export class DashboardTickets implements OnInit, OnDestroy {
     }
     
     return pages;
+  }
+
+  // Analysis styling methods
+  getPriorityBorderClass(ticket: TicketResponse): string {
+    if (!ticket.analyses || ticket.analyses.length === 0) return '';
+    const priority = ticket.analyses[0].priority;
+    switch (priority) {
+      case 'HIGH':
+        return 'priority-high-border';
+      case 'MEDIUM':
+        return 'priority-medium-border';
+      case 'LOW':
+        return 'priority-low-border';
+      default:
+        return '';
+    }
+  }
+
+  getConfidenceClass(score: number): string {
+    if (score >= 0.8) return 'confidence-high';
+    if (score >= 0.6) return 'confidence-medium';
+    return 'confidence-low';
+  }
+
+  getCategoryClass(category: string): string {
+    switch (category) {
+      case 'TECHNICAL':
+        return 'category-technical';
+      case 'BILLING':
+        return 'category-billing';
+      case 'ACCOUNT':
+        return 'category-account';
+      case 'COMPLAINT':
+        return 'category-complaint';
+      case 'REQUEST':
+        return 'category-request';
+      default:
+        return '';
+    }
+  }
+
+  getPriorityClass(priority: string): string {
+    switch (priority) {
+      case 'HIGH':
+        return 'priority-high';
+      case 'MEDIUM':
+        return 'priority-medium';
+      case 'LOW':
+        return 'priority-low';
+      default:
+        return '';
+    }
+  }
+
+  getSentimentClass(sentiment: string): string {
+    const lowerSentiment = sentiment.toLowerCase();
+    if (lowerSentiment.includes('positive') || lowerSentiment.includes('happy') || lowerSentiment.includes('calm')) {
+      return 'sentiment-positive';
+    }
+    if (lowerSentiment.includes('negative') || lowerSentiment.includes('angry') || lowerSentiment.includes('frustrated') || lowerSentiment.includes('upset')) {
+      return 'sentiment-negative';
+    }
+    return 'sentiment-neutral';
+  }
+
+  getKeywordsArray(keywords: string): string[] {
+    if (!keywords) return [];
+    return keywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
   }
 }
 
