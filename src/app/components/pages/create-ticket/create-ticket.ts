@@ -8,8 +8,9 @@ import { SupabaseService, UploadedAttachment } from '../../../services/supabase.
 import { AttachmentService } from '../../../services/attachment.service';
 import { AuthService } from '../../../services/auth.service';
 import { UserService } from '../../../services/user.service';
-import { AiAnalysisService } from '../../../services/ai-analysis.service';
+import { AiAnalysisService, TicketProgressEvent } from '../../../services/ai-analysis.service';
 import { AuthenticationResponse } from '../../../models/auth/authentication-response.model';
+import { Subscription } from 'rxjs';
 
 interface PendingAttachment {
   file: File;
@@ -17,6 +18,15 @@ interface PendingAttachment {
   backendId: number | null;
   isUploading: boolean;
   uploadError: string | null;
+}
+
+interface ProcessedTicketInfo {
+  id: number;
+  title: string;
+  category: string;
+  priority: string;
+  status: 'success' | 'failed';
+  error?: string;
 }
 
 @Component({
@@ -35,6 +45,18 @@ export class CreateTicket {
   currentFileTypeAccept: string = '';
   pendingAnalyzedTickets: any[] = [];
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+
+  // --- Streaming progress state ---
+  isBatchProcessing = false;
+  batchTotal = 0;
+  batchProcessed = 0;
+  batchSuccessCount = 0;
+  batchFailCount = 0;
+  batchProgressPercent = 0;
+  processedTickets: ProcessedTicketInfo[] = [];
+  batchErrors: string[] = [];
+  batchComplete = false;
+  private streamSubscription: Subscription | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -83,9 +105,8 @@ export class CreateTicket {
   }
 
   triggerFileUpload(fileType: string): void {
-    console.log('triggerFileUpload called with:', fileType);
     this.selectedSource = fileType;
-    
+
     // Set accept attribute based on file type
     switch (fileType) {
       case 'TXT':
@@ -103,68 +124,167 @@ export class CreateTicket {
       default:
         this.currentFileTypeAccept = '';
     }
-    
-    console.log('File accept set to:', this.currentFileTypeAccept);
+
     this.cdr.markForCheck();
-    
+
     // Trigger file input click
     setTimeout(() => {
-      console.log('Clicking file input');
       this.fileInput.nativeElement.click();
     }, 0);
   }
 
   async onTypeSpecificFileSelected(event: any): Promise<void> {
-    console.log('onTypeSpecificFileSelected called');
     const files: FileList = event.target.files;
-    console.log('Files selected:', files);
     if (files && files.length > 0) {
       const file = files[0];
-      console.log('File:', file.name, file.size);
-      this.isLoading = true;
-      this.errorMessage = null;
-      this.cdr.markForCheck();
-
-      try {
-        // Get JWT token from auth service
-        const jwtToken = this.authService.getToken();
-        console.log('JWT token:', jwtToken ? 'found' : 'not found');
-        
-        if (!jwtToken) {
-          this.errorMessage = 'Authentication required';
-          console.error('No JWT token found');
-          return;
-        }
-
-        console.log('Calling analyzeAndCreateTickets with source:', this.selectedSource);
-        // Call analyze-and-create-tickets endpoint
-        const result = await this.aiAnalysisService.analyzeAndCreateTickets(
-          file,
-          jwtToken,
-          this.selectedSource || 'WEB'
-        ).toPromise();
-        
-        console.log('Result from AI service:', result);
-        
-        if (result && result.count > 0) {
-          // Tickets created successfully in backend
-          console.log('Tickets created successfully, navigating...');
-          this.router.navigate(['/dashboard/tickets']);
-        } else {
-          this.errorMessage = 'No tickets created from file';
-          console.error('No tickets created');
-        }
-      } catch (error) {
-        console.error('Error processing file:', error);
-        this.errorMessage = error instanceof Error ? error.message : 'Failed to process file';
-      } finally {
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }
+      this.startBatchProcessing(file);
     }
-    
+
     // Reset file input
     event.target.value = '';
+  }
+
+  /**
+   * Starts the streaming batch processing flow.
+   * Connects to the SSE endpoint and updates progress in real-time.
+   */
+  private startBatchProcessing(file: File): void {
+    const jwtToken = this.authService.getToken();
+    if (!jwtToken) {
+      this.errorMessage = 'Authentication required. Please log in again.';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    // Reset state
+    this.isBatchProcessing = true;
+    this.batchTotal = 0;
+    this.batchProcessed = 0;
+    this.batchSuccessCount = 0;
+    this.batchFailCount = 0;
+    this.batchProgressPercent = 0;
+    this.processedTickets = [];
+    this.batchErrors = [];
+    this.batchComplete = false;
+    this.errorMessage = null;
+    this.isLoading = true;
+    this.cdr.markForCheck();
+
+    // Subscribe to the SSE stream
+    this.streamSubscription = this.aiAnalysisService
+      .analyzeAndCreateTicketsStream(file, jwtToken, this.selectedSource || 'WEB')
+      .subscribe({
+        next: (event: TicketProgressEvent) => {
+          this.handleProgressEvent(event);
+        },
+        error: (err: any) => {
+          console.error('Stream error:', err);
+          this.errorMessage = err?.message || 'Connection to AI service failed. Please try again.';
+          this.isBatchProcessing = false;
+          this.isLoading = false;
+          this.cdr.markForCheck();
+        },
+        complete: () => {
+          // Stream ended — if not already marked complete by a 'complete' event,
+          // mark it now (shouldn't normally happen)
+          if (!this.batchComplete) {
+            this.onBatchComplete();
+          }
+        },
+      });
+  }
+
+  /**
+   * Handles individual SSE progress events.
+   */
+  private handleProgressEvent(event: TicketProgressEvent): void {
+    switch (event.status) {
+      case 'started':
+        this.batchTotal = event.total || 0;
+        break;
+
+      case 'ticket_created':
+        this.batchProcessed = event.current || this.batchProcessed + 1;
+        this.batchSuccessCount++;
+        this.batchProgressPercent = this.batchTotal > 0
+          ? Math.round((this.batchProcessed / this.batchTotal) * 100)
+          : 0;
+
+        if (event.ticket) {
+          this.processedTickets.push({
+            id: event.ticket.id,
+            title: event.ticket.title,
+            category: event.ticket.category,
+            priority: event.ticket.priority,
+            status: 'success',
+          });
+        }
+        break;
+
+      case 'ticket_failed':
+        this.batchProcessed = event.current || this.batchProcessed + 1;
+        this.batchFailCount++;
+        this.batchProgressPercent = this.batchTotal > 0
+          ? Math.round((this.batchProcessed / this.batchTotal) * 100)
+          : 0;
+
+        if (event.error) {
+          this.batchErrors.push(event.error);
+        }
+        this.processedTickets.push({
+          id: 0,
+          title: 'Failed',
+          category: '-',
+          priority: '-',
+          status: 'failed',
+          error: event.error,
+        });
+        break;
+
+      case 'complete':
+        this.batchSuccessCount = event.successCount || this.batchSuccessCount;
+        this.batchFailCount = event.failCount || this.batchFailCount;
+        this.batchErrors = event.errors || this.batchErrors;
+        this.batchProgressPercent = 100;
+        this.onBatchComplete();
+        break;
+
+      case 'error':
+        this.errorMessage = event.message || 'An error occurred during processing.';
+        this.isBatchProcessing = false;
+        this.isLoading = false;
+        break;
+    }
+
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Called when the batch processing stream completes.
+   */
+  private onBatchComplete(): void {
+    this.batchComplete = true;
+    this.isLoading = false;
+
+    // Auto-navigate to dashboard after a delay if all succeeded
+    if (this.batchFailCount === 0 && this.batchSuccessCount > 0) {
+      setTimeout(() => {
+        this.router.navigate(['/dashboard/tickets']);
+      }, 2000);
+    }
+  }
+
+  /**
+   * Dismiss the progress overlay and navigate to dashboard.
+   */
+  dismissProgress(): void {
+    this.isBatchProcessing = false;
+    this.batchComplete = false;
+    if (this.streamSubscription) {
+      this.streamSubscription.unsubscribe();
+      this.streamSubscription = null;
+    }
+    this.router.navigate(['/dashboard/tickets']);
   }
 
   private readFileContent(file: File): Promise<string> {
@@ -289,7 +409,7 @@ export class CreateTicket {
       // Single ticket creation (manual form entry with analyze-text)
       const description = this.createForm.value.description;
       let aiAnalysis: any = null;
-      
+
       try {
         const analysisResults = await this.aiAnalysisService.analyzeText(description).toPromise();
         if (analysisResults && analysisResults.length > 0) {

@@ -9,6 +9,7 @@ import { ResetPassword } from './components/pages/reset-password/reset-password'
 import { AppShell } from './components/layout/app-shell/app-shell';
 import { DashboardTickets } from './components/pages/dashboard/dashboard-tickets/dashboard-tickets';
 import { DashboardUsers } from './components/pages/dashboard/dashboard-users/dashboard-users';
+import { DashboardStatisticsComponent } from './components/pages/dashboard/dashboard-statistics/dashboard-statistics';
 import { CreateTicket } from './components/pages/create-ticket/create-ticket';
 import { UserProfile } from './components/pages/shared/user-profile/user-profile';
 import { AgentChat } from './components/pages/agent-chat/agent-chat';
@@ -26,6 +27,7 @@ export const routes: Routes = [
     children: [
       { path: 'dashboard', redirectTo: '/dashboard/tickets', pathMatch: 'full' },
       { path: 'dashboard/tickets', component: DashboardTickets },
+      { path: 'dashboard/statistics', component: DashboardStatisticsComponent },
       {
         path: 'dashboard/users',
         component: DashboardUsers,
