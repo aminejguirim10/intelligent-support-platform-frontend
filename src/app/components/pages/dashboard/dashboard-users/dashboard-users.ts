@@ -170,9 +170,9 @@ export class DashboardUsers implements OnInit, OnDestroy {
   }
 
   private setupSearchDebounce(): void {
-    this.searchSubject.pipe(debounceTime(500)).subscribe(() => {
-      this.currentPage = 0;
-      this.loadUsers();
+    this.searchSubject.pipe(debounceTime(300)).subscribe(() => {
+      this.users = this.applyClientSideFilters(this.allUsers);
+      this.cdr.markForCheck();
     });
   }
 
@@ -180,13 +180,11 @@ export class DashboardUsers implements OnInit, OnDestroy {
     this.isLoading = true;
     this.cdr.markForCheck();
     
-    const nameParam = this.searchText || undefined;
-    const emailParam = this.searchText || undefined;
     const roleParam = this.filterRole || undefined;
     
     this.userService.getAllUsers(
-      nameParam,
-      emailParam,
+      undefined,
+      undefined,
       roleParam,
       this.currentPage,
       this.pageSize,
@@ -195,7 +193,7 @@ export class DashboardUsers implements OnInit, OnDestroy {
     ).subscribe({
       next: (page: PageResponse<UserResponse>) => {
         this.allUsers = page.content;
-        this.users = page.content;
+        this.users = this.applyClientSideFilters(page.content);
         this.currentPage = page.currentPage;
         this.totalPages = page.totalPages;
         this.totalElements = page.totalElements;
@@ -209,6 +207,21 @@ export class DashboardUsers implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  applyClientSideFilters(users: UserResponse[]): UserResponse[] {
+    let filtered = users;
+    
+    if (this.searchText) {
+      const searchLower = this.searchText.toLowerCase();
+      filtered = filtered.filter(user => 
+        user.name.toLowerCase().includes(searchLower) ||
+        user.email.toLowerCase().includes(searchLower) ||
+        (user.phoneNumber && user.phoneNumber.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    return filtered;
   }
 
   loadAllUsersForStats(): void {
