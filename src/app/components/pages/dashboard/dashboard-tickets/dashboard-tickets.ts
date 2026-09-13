@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
-import { debounceTime, Subject } from 'rxjs';
+import { debounceTime, firstValueFrom, Subject } from 'rxjs';
 import { CommonModule, DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -67,6 +67,7 @@ export class DashboardTickets implements OnInit, OnDestroy {
   editError: string | null = null;
   isSavingEdit = false;
   originalStatus: TicketStatus | null = null;
+  isExportingPdf = false;
 
   // Pagination state
   currentPage = 0;
@@ -86,7 +87,7 @@ export class DashboardTickets implements OnInit, OnDestroy {
   filterSources = ['', ...Object.values(TicketSource)];
   filterCategories = ['', ...Object.values(TicketCategory)];
   filterPriorities = ['', ...Object.values(TicketPriority)];
-  
+
   // Debounced search
   private searchSubject = new Subject<string>();
 
@@ -137,11 +138,11 @@ export class DashboardTickets implements OnInit, OnDestroy {
   loadTickets(): void {
     this.isLoading = true;
     this.cdr.markForCheck();
-    
+
     const titleParam = this.searchText || undefined;
     const statusParam = this.filterStatus || undefined;
     const sourceParam = this.filterSource || undefined;
-    
+
     const observable = this.isAdmin
       ? this.ticketService.getAllTickets(
           titleParam,
@@ -150,7 +151,7 @@ export class DashboardTickets implements OnInit, OnDestroy {
           this.currentPage,
           this.pageSize,
           'createdAt',
-          'desc'
+          'desc',
         )
       : this.ticketService.getCurrentUserTickets(
           titleParam,
@@ -159,7 +160,7 @@ export class DashboardTickets implements OnInit, OnDestroy {
           this.currentPage,
           this.pageSize,
           'createdAt',
-          'desc'
+          'desc',
         );
 
     observable.subscribe({
@@ -183,21 +184,25 @@ export class DashboardTickets implements OnInit, OnDestroy {
 
   applyClientSideFilters(tickets: TicketResponse[]): TicketResponse[] {
     let filtered = tickets;
-    
+
     if (this.filterCategory) {
-      filtered = filtered.filter(ticket => 
-        ticket.analyses && ticket.analyses.length > 0 && 
-        ticket.analyses[0].category === this.filterCategory
+      filtered = filtered.filter(
+        (ticket) =>
+          ticket.analyses &&
+          ticket.analyses.length > 0 &&
+          ticket.analyses[0].category === this.filterCategory,
       );
     }
-    
+
     if (this.filterPriority) {
-      filtered = filtered.filter(ticket => 
-        ticket.analyses && ticket.analyses.length > 0 && 
-        ticket.analyses[0].priority === this.filterPriority
+      filtered = filtered.filter(
+        (ticket) =>
+          ticket.analyses &&
+          ticket.analyses.length > 0 &&
+          ticket.analyses[0].priority === this.filterPriority,
       );
     }
-    
+
     return filtered;
   }
 
@@ -623,7 +628,7 @@ export class DashboardTickets implements OnInit, OnDestroy {
   get pageNumbers(): number[] {
     const pages: number[] = [];
     const maxVisiblePages = 3;
-    
+
     if (this.totalPages <= maxVisiblePages) {
       for (let i = 0; i < this.totalPages; i++) {
         pages.push(i);
@@ -631,12 +636,12 @@ export class DashboardTickets implements OnInit, OnDestroy {
     } else {
       const startPage = Math.max(0, this.currentPage - 2);
       const endPage = Math.min(this.totalPages - 1, this.currentPage + 2);
-      
+
       for (let i = startPage; i <= endPage; i++) {
         pages.push(i);
       }
     }
-    
+
     return pages;
   }
 
@@ -694,10 +699,19 @@ export class DashboardTickets implements OnInit, OnDestroy {
 
   getSentimentClass(sentiment: string): string {
     const lowerSentiment = sentiment.toLowerCase();
-    if (lowerSentiment.includes('positive') || lowerSentiment.includes('happy') || lowerSentiment.includes('calm')) {
+    if (
+      lowerSentiment.includes('positive') ||
+      lowerSentiment.includes('happy') ||
+      lowerSentiment.includes('calm')
+    ) {
       return 'sentiment-positive';
     }
-    if (lowerSentiment.includes('negative') || lowerSentiment.includes('angry') || lowerSentiment.includes('frustrated') || lowerSentiment.includes('upset')) {
+    if (
+      lowerSentiment.includes('negative') ||
+      lowerSentiment.includes('angry') ||
+      lowerSentiment.includes('frustrated') ||
+      lowerSentiment.includes('upset')
+    ) {
       return 'sentiment-negative';
     }
     return 'sentiment-neutral';
@@ -705,7 +719,265 @@ export class DashboardTickets implements OnInit, OnDestroy {
 
   getKeywordsArray(keywords: string): string[] {
     if (!keywords) return [];
-    return keywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    return keywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+  }
+
+  exportThisWeekTickets(): void {
+    const thisWeekTickets = this.getThisWeekTickets(this.allTickets);
+    const now = new Date();
+
+    if (thisWeekTickets.length === 0) {
+      alert('No tickets found for this week.');
+      return;
+    }
+
+    const csvContent = this.generateCSV(thisWeekTickets);
+    this.downloadCSV(csvContent, `tickets-week-${now.toISOString().split('T')[0]}.csv`);
+  }
+
+  async exportTicketsAsPdf(): Promise<void> {
+    if (this.isExportingPdf) return;
+
+    this.isExportingPdf = true;
+    this.cdr.markForCheck();
+
+    try {
+      const exportTickets = await this.loadThisWeekTicketsForExport();
+
+      if (exportTickets.length === 0) {
+        alert('No tickets found for this week.');
+        return;
+      }
+
+      const [{ default: jsPDF }, autoTableModule] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ]);
+      const autoTable = autoTableModule.default ?? autoTableModule;
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const range = this.getThisWeekDateRange();
+      const title = 'Weekly Tickets Report';
+      const subtitle = `${this.formatDateForReport(range.start)} - ${this.formatDateForReport(range.end)}`;
+      const fileName = `weekly-tickets-report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+      autoTable(doc, {
+        startY: 102,
+        margin: { top: 102, left: 32, right: 32, bottom: 44 },
+        head: [['ID', 'Title', 'User', 'Status', 'Source', 'Category', 'Priority', 'Created At']],
+        body: exportTickets.map((ticket) => {
+          const analysis =
+            ticket.analyses && ticket.analyses.length > 0 ? ticket.analyses[0] : null;
+
+          return [
+            `#${ticket.id}`,
+            ticket.title || '-',
+            ticket.userEmail || '-',
+            ticket.status || '-',
+            ticket.source || '-',
+            analysis?.category || 'N/A',
+            analysis?.priority || 'N/A',
+            new Date(ticket.createdAt).toLocaleString(),
+          ];
+        }),
+        theme: 'striped',
+        styles: {
+          font: 'helvetica',
+          fontSize: 8.25,
+          cellPadding: 5,
+          textColor: [55, 65, 81],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.5,
+          overflow: 'linebreak',
+          valign: 'middle',
+        },
+        headStyles: {
+          fillColor: [22, 101, 52],
+          textColor: 255,
+          fontStyle: 'bold',
+          halign: 'left',
+        },
+        alternateRowStyles: {
+          fillColor: [240, 253, 244],
+        },
+        columnStyles: {
+          0: { cellWidth: 44 },
+          1: { cellWidth: 180 },
+          2: { cellWidth: 140 },
+          3: { cellWidth: 72 },
+          4: { cellWidth: 66 },
+          5: { cellWidth: 90 },
+          6: { cellWidth: 72 },
+          7: { cellWidth: 110 },
+        },
+        didDrawPage: (data) => {
+          doc.setFillColor(22, 101, 52);
+          doc.rect(0, 0, pageWidth, 64, 'F');
+          doc.setFillColor(34, 197, 94);
+          doc.rect(0, 64, pageWidth, 4, 'F');
+
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(19);
+          doc.text(title, 32, 28);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.text(subtitle, 32, 46);
+
+          doc.setFillColor(255, 255, 255);
+          doc.roundedRect(pageWidth - 196, 18, 164, 28, 10, 10, 'F');
+          doc.setTextColor(22, 101, 52);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.text(
+            `${exportTickets.length} ticket${exportTickets.length === 1 ? '' : 's'}`,
+            pageWidth - 114,
+            36,
+            { align: 'center' },
+          );
+
+          doc.setDrawColor(226, 232, 240);
+          doc.setLineWidth(1);
+          doc.line(32, pageHeight - 34, pageWidth - 32, pageHeight - 34);
+
+          doc.setTextColor(100, 116, 139);
+          doc.setFontSize(9);
+          doc.text(`Page ${data.pageNumber}`, pageWidth - 32, pageHeight - 18, { align: 'right' });
+        },
+      });
+
+      doc.save(fileName);
+    } catch (error) {
+      console.error('Failed to export tickets as PDF:', error);
+      alert('Unable to export tickets as PDF right now.');
+    } finally {
+      this.isExportingPdf = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  private getThisWeekDateRange(): { start: Date; end: Date } {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return { start: startOfWeek, end: endOfWeek };
+  }
+
+  private getThisWeekTickets(tickets: TicketResponse[]): TicketResponse[] {
+    const { start, end } = this.getThisWeekDateRange();
+    return tickets.filter((ticket) => {
+      const ticketDate = new Date(ticket.createdAt);
+      return ticketDate >= start && ticketDate <= end;
+    });
+  }
+
+  private formatDateForReport(date: Date): string {
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+    });
+  }
+
+  private async loadThisWeekTicketsForExport(): Promise<TicketResponse[]> {
+    const pageSize = 100;
+    const exportTickets: TicketResponse[] = [];
+    let pageIndex = 0;
+    let hasNext = true;
+
+    while (hasNext) {
+      const titleParam = this.searchText || undefined;
+      const statusParam = this.filterStatus || undefined;
+      const sourceParam = this.filterSource || undefined;
+
+      const pageResponse = await firstValueFrom(
+        this.isAdmin
+          ? this.ticketService.getAllTickets(
+              titleParam,
+              statusParam,
+              sourceParam,
+              pageIndex,
+              pageSize,
+              'createdAt',
+              'desc',
+            )
+          : this.ticketService.getCurrentUserTickets(
+              titleParam,
+              statusParam,
+              sourceParam,
+              pageIndex,
+              pageSize,
+              'createdAt',
+              'desc',
+            ),
+      );
+
+      const filteredPage = this.getThisWeekTickets(
+        this.applyClientSideFilters(pageResponse.content),
+      );
+      exportTickets.push(...filteredPage);
+      hasNext = pageResponse.hasNext;
+      pageIndex++;
+    }
+
+    return exportTickets;
+  }
+
+  private generateCSV(tickets: TicketResponse[]): string {
+    const headers = [
+      'ID',
+      'Title',
+      'Description',
+      'Status',
+      'Source',
+      'Category',
+      'Priority',
+      'Sentiment',
+      'Created At',
+    ];
+    const rows = tickets.map((ticket) => {
+      const analysis = ticket.analyses && ticket.analyses.length > 0 ? ticket.analyses[0] : null;
+      return [
+        ticket.id,
+        `"${(ticket.title || '').replace(/"/g, '""')}"`,
+        `"${(ticket.description || '').replace(/"/g, '""')}"`,
+        ticket.status,
+        ticket.source,
+        analysis?.category || 'N/A',
+        analysis?.priority || 'N/A',
+        analysis?.sentiment || 'N/A',
+        new Date(ticket.createdAt).toLocaleString(),
+      ].join(',');
+    });
+
+    return [headers.join(','), ...rows].join('\n');
+  }
+
+  private downloadCSV(content: string, filename: string): void {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
   }
 }
-
