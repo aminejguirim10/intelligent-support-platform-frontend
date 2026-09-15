@@ -4,4 +4,5 @@ export interface AnalysisRequest {
   sentiment: string;
   keywords: string;
   confidenceScore: number;
+  advice: string;
 }

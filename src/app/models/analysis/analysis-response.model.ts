@@ -8,6 +8,7 @@ export interface AnalysisResponse {
   sentiment: string;
   keywords: string;
   confidenceScore: number;
+  advice: string;
   createdAt: string;
   ticketId: number;
 }

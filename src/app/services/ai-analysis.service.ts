@@ -9,6 +9,7 @@ interface FastAPIAnalysisResponse {
   sentiment: string;
   keywords: string;
   confidenceScore: number;
+  advice: string;
 }
 
 interface FastAPIRequest {

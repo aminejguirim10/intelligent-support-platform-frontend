@@ -59,6 +59,8 @@ export class DashboardTickets implements OnInit, OnDestroy {
   ticketToClose: TicketResponse | null = null;
   showEditDialog = false;
   ticketToEdit: TicketResponse | null = null;
+  showDetailDialog = false;
+  ticketToView: TicketResponse | null = null;
   editForm: FormGroup;
   editSources = Object.values(TicketSource);
   editStatuses = Object.values(TicketStatus);
@@ -335,6 +337,19 @@ export class DashboardTickets implements OnInit, OnDestroy {
     this.editPendingAttachments = [];
     this.editExistingAttachments = [];
     this.editError = null;
+    this.cdr.markForCheck();
+  }
+
+  openDetailDialog(ticket: TicketResponse): void {
+    this.ticketToView = ticket;
+    this.showDetailDialog = true;
+    this.openMenuId = null;
+    this.cdr.markForCheck();
+  }
+
+  closeDetailDialog(): void {
+    this.showDetailDialog = false;
+    this.ticketToView = null;
     this.cdr.markForCheck();
   }
 

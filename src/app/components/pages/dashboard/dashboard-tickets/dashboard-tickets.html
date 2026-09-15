@@ -176,6 +176,7 @@
       *ngFor="let ticket of tickets"
       class="ticket-card"
       [ngClass]="getPriorityBorderClass(ticket)"
+      (click)="openDetailDialog(ticket)"
     >
       <div class="ticket-header">
         <div class="ticket-title-section">
@@ -188,7 +189,7 @@
           </span>
           <div class="ticket-actions">
             <button
-              (click)="toggleMenu(ticket.id, $event)"
+              (click)="toggleMenu(ticket.id, $event); $event.stopPropagation()"
               class="action-btn menu-btn"
               title="Actions"
             >
@@ -725,6 +726,130 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Ticket Detail Dialog -->
+  <div *ngIf="showDetailDialog" class="dialog-overlay" (click)="closeDetailDialog()">
+    <div class="dialog-box detail-dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h3>Ticket Details</h3>
+        <button (click)="closeDetailDialog()" class="close-btn">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            class="close-icon"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div *ngIf="ticketToView" class="ticket-detail-content">
+        <!-- Ticket Header -->
+        <div class="detail-header">
+          <div class="detail-id-section">
+            <span class="detail-id-badge">#{{ ticketToView.id }}</span>
+            <span class="detail-status" [ngClass]="getStatusClass(ticketToView.status)">
+              {{ ticketToView.status }}
+            </span>
+          </div>
+          <div class="detail-meta">
+            <span class="detail-source" [ngClass]="getSourceBadge(ticketToView.source)">
+              {{ ticketToView.source }}
+            </span>
+            <span class="detail-date">
+              {{ ticketToView.createdAt | date: 'medium' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Ticket Title and Description -->
+        <div class="detail-main">
+          <h2 class="detail-title">{{ ticketToView.title }}</h2>
+          <p class="detail-description">{{ ticketToView.description }}</p>
+        </div>
+
+        <!-- AI Advice -->
+        <div *ngIf="ticketToView.analyses && ticketToView.analyses.length > 0 && ticketToView.analyses[0].advice" class="detail-advice-standalone">
+          <div class="advice-header">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="advice-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.75 6.75 0 011.5-9.75 6.75 6.75 0 00-7.5 0 6.75 6.75 0 00-1.5 9.75m0 0a6.75 6.75 0 01-1.5 9.75 6.75 6.75 0 007.5 0 6.75 6.75 0 011.5-9.75M12 18V7.5" />
+            </svg>
+            <span class="advice-label">AI Advice</span>
+          </div>
+          <p class="advice-text">{{ ticketToView.analyses[0].advice }}</p>
+        </div>
+
+        <!-- Attachments -->
+        <div *ngIf="ticketToView.attachments && ticketToView.attachments.length > 0" class="detail-attachments">
+          <h4 class="detail-section-title">Attachments</h4>
+          <div class="detail-attachments-list">
+            <a
+              *ngFor="let attachment of ticketToView.attachments"
+              [href]="attachment.publicUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="detail-attachment-item"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="attachment-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+              </svg>
+              <span class="attachment-name">{{ attachment.filename }}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="download-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- AI Analysis -->
+        <div *ngIf="ticketToView.analyses && ticketToView.analyses.length > 0" class="detail-analysis">
+          <h4 class="detail-section-title">AI Analysis</h4>
+          <div class="analysis-confidence">
+            <span class="confidence-label">Confidence Score</span>
+            <span class="confidence-value" [ngClass]="getConfidenceClass(ticketToView.analyses[0].confidenceScore)">
+              {{ (ticketToView.analyses[0].confidenceScore * 100).toFixed(0) }}%
+            </span>
+          </div>
+
+          <div class="analysis-grid">
+            <div class="analysis-item">
+              <span class="analysis-label">Category</span>
+              <span class="analysis-badge category" [ngClass]="getCategoryClass(ticketToView.analyses[0].category)">
+                {{ ticketToView.analyses[0].category }}
+              </span>
+            </div>
+            <div class="analysis-item">
+              <span class="analysis-label">Priority</span>
+              <span class="analysis-badge priority" [ngClass]="getPriorityClass(ticketToView.analyses[0].priority)">
+                {{ ticketToView.analyses[0].priority }}
+              </span>
+            </div>
+            <div class="analysis-item">
+              <span class="analysis-label">Sentiment</span>
+              <span class="analysis-badge sentiment" [ngClass]="getSentimentClass(ticketToView.analyses[0].sentiment)">
+                {{ ticketToView.analyses[0].sentiment }}
+              </span>
+            </div>
+          </div>
+
+          <div class="analysis-keywords">
+            <span class="analysis-label">Keywords</span>
+            <div class="keywords-container">
+              <span
+                *ngFor="let keyword of getKeywordsArray(ticketToView.analyses[0].keywords)"
+                class="keyword-tag"
+              >
+                {{ keyword }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
