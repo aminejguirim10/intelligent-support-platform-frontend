@@ -1,6 +1,10 @@
 <div class="dashboard-statistics">
+  <!-- Header Section -->
   <div class="page-header">
-    <h2>Statistics</h2>
+    <div class="header-content">
+      <h2>Statistics</h2>
+      <p class="page-subtitle">Analytics & Insights</p>
+    </div>
   </div>
 
   <div *ngIf="isLoading" class="loading-container">
@@ -72,6 +76,65 @@
         <div class="metric-content">
           <p class="metric-label">This Week</p>
           <p class="metric-value">{{ statistics.ticketsThisWeek }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Widgets Grid -->
+    <div class="widgets-grid">
+      <!-- Resolution Rate Widget -->
+      <div class="dashboard-widget">
+        <div class="widget-header">
+          <h3 class="widget-title">Resolution Rate</h3>
+        </div>
+        <div class="statistic-content">
+          <div class="statistic-value">{{ widgets[0].value }}%</div>
+          <div class="statistic-change positive">
+            <svg xmlns="http://www.w3.org/2000/svg" class="change-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            {{ absValue(widgets[0].change) }}%
+          </div>
+        </div>
+      </div>
+
+      <!-- Avg Response Time Widget -->
+      <div class="dashboard-widget">
+        <div class="widget-header">
+          <h3 class="widget-title">Avg Response Time</h3>
+        </div>
+        <div class="statistic-content">
+          <div class="statistic-value">{{ widgets[1].value }}h</div>
+          <div class="statistic-change negative">
+            <svg xmlns="http://www.w3.org/2000/svg" class="change-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+            </svg>
+            {{ absValue(widgets[1].change) }}%
+          </div>
+        </div>
+      </div>
+
+      <!-- Ticket List Widget -->
+      <div class="dashboard-widget" style="grid-column: span 2;">
+        <div class="widget-header">
+          <h3 class="widget-title">Recent High Priority</h3>
+        </div>
+        <div class="ticket-list-content">
+          <div class="ticket-list">
+            <div *ngFor="let ticket of widgets[2].tickets" class="ticket-item">
+              <div class="ticket-info">
+                <span class="ticket-title">{{ ticket.title }}</span>
+                <div class="ticket-meta">
+                  <span class="ticket-status" [style.background-color]="getStatusColor(ticket.status)">
+                    {{ ticket.status }}
+                  </span>
+                  <span class="ticket-priority" [style.color]="getPriorityColor(ticket.priority)">
+                    {{ ticket.priority }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
