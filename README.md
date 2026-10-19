@@ -330,17 +330,11 @@ The project uses Prettier for code formatting:
 - Single quotes for strings
 - Angular parser for HTML files
 
-## � Collaborators
-
-- Mohamed Amine Jguirim
-- Fares Tekaya
-- Firas Hizem
-
 ## 📄 License
 
 This project is part of the Intelligent Support Platform internship project.
 
-## �🔗 Related Projects
+## 🔗 Related Projects
 
 - [Backend Service](https://github.com/aminejguirim10/intelligent-support-platform-backend) - Spring Boot REST API
 - [AI Service](https://github.com/aminejguirim10/intelligent-support-platform-ai) - FastAPI AI Analysis Service
